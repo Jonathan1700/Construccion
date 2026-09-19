@@ -47,7 +47,16 @@ from .tracker import TrackerPersonas
 logger = logging.getLogger(__name__)
 
 CLASES_PERSONA = {"person"}
-CLASES_OBJETO_RELEVANTE = {"backpack", "handbag", "cup", "bottle", "bowl"}
+# COCO (dataset de YOLOv8n) no tiene clase "plato": un plato liso sobre la mesa
+# nunca va a matchear aquí. Se cubre lo más parecido disponible (cubiertos,
+# vasos, comida) para que "objeto abandonado" dispare en más casos reales,
+# pero sigue siendo un límite del modelo, no de esta lista.
+CLASES_OBJETO_RELEVANTE = {
+    "backpack", "handbag", "cup", "bottle", "bowl", "wine glass",
+    "fork", "knife", "spoon",
+    "banana", "apple", "sandwich", "orange", "broccoli", "carrot",
+    "hot dog", "pizza", "donut", "cake",
+}
 
 
 class ConfigMesas:
@@ -60,6 +69,20 @@ class ConfigMesas:
     @property
     def periodo_gracia(self) -> timedelta:
         return timedelta(seconds=self.parametros["periodo_gracia_segundos"])
+
+    @property
+    def umbral_overlap_visita_staff(self) -> float:
+        """
+        Umbral de overlap para registrar que un track "visitó" una mesa (usado
+        por la heurística de staff). Deliberadamente MÁS BAJO que
+        umbral_overlap_ocupacion: un mesero pasando a dejar/recoger algo solo
+        roza el borde de la zona (overlap parcial), mientras que confirmar que
+        un cliente está sentado exige un overlap mucho mayor. Si se reutilizara
+        el mismo umbral para ambas cosas, subir uno para filtrar falsos
+        positivos de gente pasando cerca de la mesa termina también apagando
+        la detección de visitas de staff.
+        """
+        return self.parametros.get("umbral_overlap_visita_staff", 0.15)
 
     @property
     def timeout_objeto_abandonado(self) -> timedelta:
@@ -96,6 +119,11 @@ class VisionPipeline:
         self.api = api_client or ApiClient()
         # mesa_id -> id de EventoOcupacion abierto en la API
         self._ocupacion_api_id: dict[int, int] = {}
+        # (track_id, mesa_id) -> inicio de la visita en curso (overlap sostenido)
+        self._visita_activa: dict[tuple[int, int], datetime] = {}
+        # expuestos para el modo visual (visualizar.py); no se usan en el flujo normal
+        self._ultimos_tracks: list = []
+        self._ultimos_objetos: list = []
 
         # --- evidencia (clips a S3) ---
         self.storage = storage or S3EvidenceStorage()
@@ -130,6 +158,9 @@ class VisionPipeline:
         objetos = [d for d in detecciones if d.clase in CLASES_OBJETO_RELEVANTE]
 
         tracks = self.tracker.actualizar(personas, frame)
+        # expuestos para el modo visual (visualizar.py); no se usan en el flujo normal
+        self._ultimos_tracks = tracks
+        self._ultimos_objetos = objetos
 
         snapshots_ocupadas = []
         umbral_ocupacion = self.config.parametros["umbral_overlap_ocupacion"]
@@ -141,6 +172,10 @@ class VisionPipeline:
             max_overlap_persona = max(overlaps_persona + [0.0])
             max_overlap_objeto = max(overlaps_objeto + [0.0])
             num_personas = sum(1 for r in overlaps_persona if r >= umbral_ocupacion)
+
+            self._actualizar_visitas_mesa(
+                mesa_id, tracks, overlaps_persona, self.config.umbral_overlap_visita_staff, timestamp
+            )
 
             # histéresis simple: umbral más bajo para liberar que para ocupar,
             # así evitamos parpadeo en el borde de la zona.
@@ -179,6 +214,67 @@ class VisionPipeline:
         )
         for mesa_a, mesa_b in fusiones:
             self._despachar_fusion(mesa_a, mesa_b)
+
+        self._cerrar_visitas_de_tracks_ausentes(tracks, timestamp)
+
+    # --- personal por comportamiento + entregas ----------------------------------------
+
+    def _actualizar_visitas_mesa(self, mesa_id, tracks, overlaps, umbral, timestamp):
+        """Abre/cierra la visita de cada track a esta mesa según el overlap del frame."""
+        ids_con_overlap = set()
+        for track, overlap in zip(tracks, overlaps):
+            key = (track.track_id, mesa_id)
+            if overlap >= umbral:
+                ids_con_overlap.add(track.track_id)
+                self._visita_activa.setdefault(key, timestamp)
+            elif key in self._visita_activa:
+                self._cerrar_visita(key, timestamp)
+        # cierra visitas de tracks que siguen en escena pero ya no solapan esta mesa
+        for key in list(self._visita_activa):
+            track_id, mesa_id_activa = key
+            if mesa_id_activa == mesa_id and track_id not in ids_con_overlap:
+                self._cerrar_visita(key, timestamp)
+
+    def _cerrar_visitas_de_tracks_ausentes(self, tracks, timestamp):
+        """Cierra visitas de tracks que ya no aparecen en el frame (salieron de escena)."""
+        ids_presentes = {t.track_id for t in tracks}
+        for key in list(self._visita_activa):
+            track_id, _ = key
+            if track_id not in ids_presentes:
+                self._cerrar_visita(key, timestamp)
+
+    def _cerrar_visita(self, key, fin):
+        inicio = self._visita_activa.pop(key, None)
+        if inicio is None:
+            return
+        track_id, mesa_id = key
+        self.clasificador_staff.registrar_visita(track_id, mesa_id, inicio, fin)
+        self._evaluar_entrega(track_id, mesa_id, fin)
+
+    def _evaluar_entrega(self, track_id, mesa_id, timestamp):
+        """
+        Si esta visita ya alcanza para clasificar al track como staff y la mesa
+        sigue ocupada por un cliente, se reporta una entrega. Las visitas previas
+        del mismo track (antes de acumular 3 mesas distintas) no generan entrega
+        retroactiva: hasta ese punto el sistema no tenía forma de distinguirlo de
+        un cliente que solo pasó cerca de la mesa.
+        """
+        if not self.clasificador_staff.es_staff(track_id, timestamp):
+            return
+        ocupacion_id = self._ocupacion_api_id.get(mesa_id)
+        if ocupacion_id is None:
+            return
+        personal = self.api.obtener_o_crear_personal(str(track_id))
+        self.api.reportar_entrega(
+            ocupacion_id,
+            tipo="otro",
+            timestamp=timestamp,
+            personal_id=personal.get("id"),
+            confianza=1.0,
+        )
+        logger.info(
+            "Entrega reportada: mesa %s, ocupacion %s, personal %s", mesa_id, ocupacion_id, personal.get("id")
+        )
 
     # --- despacho a la API ------------------------------------------------------------
 

@@ -141,7 +141,7 @@ def metrica_uso_mesas(request):
         ocupaciones = mesa.eventos_ocupacion.exclude(estado=EventoOcupacion.Estado.FUSIONADA)
         total_ocupaciones = ocupaciones.count()
         tiempo_total = sum(
-            ((o.fin or ahora) - o.inicio).total_seconds() for o in ocupaciones
+            max(((o.fin or ahora) - o.inicio).total_seconds(), 0) for o in ocupaciones
         )
         resultados.append(
             {

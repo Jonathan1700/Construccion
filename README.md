@@ -7,7 +7,7 @@ DOI 10.46604/peti.2026.15704).
 
 ## Contexto real
 
-Se aplica a un restaurante real de encebollados/picantería cerca de la universidad,
+Se aplica a un restaurante real de encebollados/picantería cerca de la universidad
 con acceso confirmado a sus cámaras de seguridad (feed en vivo y grabaciones). En
 este negocio el cliente pide y paga en caja, elige mesa libremente, y el personal
 lleva el pedido — no hay atención de mesa tradicional ni uniforme distintivo.

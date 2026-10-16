@@ -1,0 +1,98 @@
+{% extends "panel/base.html" %}
+{% load static panel_extras %}
+{% block title %}Inicio{% endblock %}
+
+{% block header %}
+<header class="pagehead">
+  <div>
+    <div class="kicker" style="text-transform:none;letter-spacing:0;font-size:13px;font-weight:600">{{ hoy|fecha_larga }}</div>
+    <h1 class="h1"><span class="t-m">Hola, {{ request.user.first_name|default:"Admin" }}</span><span class="t-d">Resumen de hoy</span></h1>
+  </div>
+  <div class="actions">
+    <span class="muted d-inline" style="font-size:13px;font-weight:600">{{ est.camara.nombre }}</span>
+    {% if est.camara.en_vivo %}<span class="chip chip--libre d-inline">En vivo</span>{% else %}<span class="chip chip--ocupada d-inline">Sin señal</span>{% endif %}
+    <a class="iconbtn only-m" href="{% url 'panel:ajustes' %}" aria-label="Ajustes">{% icon 'settings' 20 %}</a>
+  </div>
+</header>
+{% endblock %}
+
+{% block content %}
+<section class="card m-only" style="padding:14px" aria-label="Cámara">
+  <div class="row-between">
+    <div style="display:flex;align-items:center;gap:12px">
+      <span class="tile-ico" style="width:40px;height:40px">{% icon 'camera' 20 %}</span>
+      <div><strong style="font-size:14px;display:block">{{ est.camara.nombre }}</strong>
+      <span class="muted" style="font-size:12px">{{ est.camara.mesas }} mesas · {{ est.camara.zonas_excluidas }} zona excluida</span></div>
+    </div>
+    {% if est.camara.en_vivo %}<span class="chip chip--libre">En vivo</span>{% else %}<span class="chip chip--ocupada">Sin señal</span>{% endif %}
+  </div>
+</section>
+
+<section class="hero m-only" aria-label="Ocupación en vivo">
+  <div class="row-between" style="align-items:flex-end">
+    <div style="display:flex;align-items:baseline;gap:8px"><span class="big num" data-bind="ocupadas">{{ resumen.ocupadas }}</span><span class="lbl">de {{ resumen.total }} ocupadas</span></div>
+    <div class="aside"><small>Personas</small><strong class="num" data-bind="personas">{{ resumen.personas }}</strong></div>
+  </div>
+  <div class="occbar" aria-hidden="true">{% for m in est.mesas %}<span class="{{ m.estado }}"></span>{% endfor %}</div>
+  <div class="legend"><span><b data-bind="libres">{{ resumen.libres }}</b> libres</span><span><b data-bind="casi_libres">{{ resumen.casi_libres }}</b> casi libre</span><span><b data-bind="ocupadas">{{ resumen.ocupadas }}</b> ocupadas</span></div>
+</section>
+
+<section class="kpis d-only" aria-label="Indicadores clave">
+  <div class="kpi kpi--dark"><span class="l">{% icon 'grid' 18 %}Ocupación ahora</span><span class="v"><span data-bind="ocupadas">{{ resumen.ocupadas }}</span> / {{ resumen.total }}</span><span class="s"><span data-bind="personas">{{ resumen.personas }}</span> personas en el salón</span></div>
+  <div class="kpi"><span class="l">{% icon 'clock' 18 %}Espera promedio</span><span class="v">{{ esp.promedio_s|mmss }}</span><span class="s">{{ esp.delta_ayer_s|con_signo }} respecto a ayer</span></div>
+  <div class="kpi"><span class="l">{% icon 'users' 18 %}Quién atiende más</span><span class="v">{{ per.top.codigo }}</span><span class="s">{{ per.top.mesas }} mesas · {{ per.top.pct_entregas }} % de entregas</span></div>
+  <div class="kpi"><span class="l">{% icon 'chart' 18 %}Mesa más / menos usada</span><span class="v">{{ uso.mas_usada.codigo }} · {{ uso.menos_usada.codigo }}</span><span class="s">{{ uso.mas_usada.usos }} y {{ uso.menos_usada.usos }} ocupaciones</span></div>
+</section>
+
+<section class="m-only" aria-labelledby="t-metricas">
+  <h2 class="h2" id="t-metricas" style="margin-bottom:12px">Métricas del día</h2>
+  <div class="group">
+    <a class="metric" href="{% url 'panel:espera' %}">
+      <span class="metric-head"><span><i class="tile-ico">{% icon 'clock' 19 %}</i>Tiempo de espera</span>{% icon 'right' 18 %}</span>
+      <div class="row-between" style="align-items:flex-end"><span class="valor num">{{ esp.promedio_s|mmss }} <small>min prom.</small></span>
+        <span class="spark" aria-hidden="true">{% for h in esp.por_hora %}<i style="height:{% porcentaje h.min max_hora as pc %}{{ pc }}%"></i>{% endfor %}</span></div>
+      <span class="muted" style="font-size:13px"><span {% if esp.delta_ayer_s > 0 %}class="tarde-txt"{% endif %}>{{ esp.delta_ayer_s|con_signo }}</span> respecto a ayer</span>
+    </a>
+    <a class="metric" href="{% url 'panel:personal' %}">
+      <span class="metric-head"><span><i class="tile-ico">{% icon 'users' 19 %}</i>Quién atiende más</span>{% icon 'right' 18 %}</span>
+      <span class="valor">{{ per.top.codigo }}</span>
+      <span class="muted" style="font-size:13px">{{ per.top.mesas }} mesas atendidas · {{ per.top.pct_entregas }} % de las entregas</span>
+    </a>
+    <a class="metric" href="{% url 'panel:uso_mesas' %}">
+      <span class="metric-head"><span><i class="tile-ico">{% icon 'chart' 19 %}</i>Uso de mesas</span>{% icon 'right' 18 %}</span>
+      <div class="two">
+        <div class="mini"><small>Más usada</small><strong>{{ uso.mas_usada.codigo }}</strong><em>{{ uso.mas_usada.usos }} veces</em></div>
+        <div class="mini mini--plain"><small>Menos usada</small><strong>{{ uso.menos_usada.codigo }}</strong><em>{{ uso.menos_usada.usos }} veces</em></div>
+      </div>
+      <span class="muted" style="font-size:13px">Conteo de ocupaciones de hoy</span>
+    </a>
+  </div>
+</section>
+
+<div class="dash-grid">
+  <section class="card card--plano d-only" aria-labelledby="t-plano">
+    <div class="row-between"><h2 class="h2" id="t-plano">Plano en vivo</h2>
+      <div class="legend-mesas"><span><i class="i-libre"></i>Libre</span><span><i class="i-casi_libre"></i>Casi libre</span><span><i class="i-ocupada"></i>Ocupada</span></div></div>
+    {% include "panel/partials/_plano.html" with mesas=mesas_plano plano=est.plano enlace=True %}
+  </section>
+
+  <section aria-labelledby="t-esperando" class="esperando">
+    <div class="d-card-wrap">
+      <div class="wait-head"><h2 class="h2" id="t-esperando">Esperando ahora</h2><a class="h2" style="font-size:13px;color:var(--petroleo)" href="{% url 'panel:espera' %}">Ver todas</a></div>
+      {% for f in est.en_espera %}{% include "panel/partials/_fila_espera.html" with f=f promedio=esp.promedio_s detalle=False %}{% endfor %}
+    </div>
+  </section>
+</div>
+
+<div class="dash-grid2 d-only">
+  <section class="card" aria-labelledby="t-horas">
+    <div class="row-between"><h2 class="h2" id="t-horas">Espera promedio por hora</h2><span class="muted" style="font-size:12px;font-weight:600">minutos</span></div>
+    <div class="bars">{% for h in esp.por_hora %}<div class="col {% if h.min == max_hora %}top{% endif %}"><span class="val">{{ h.min }}</span><span class="barra" style="--p:{% porcentaje h.min max_hora as pc %}{{ pc }}"></span><span class="hr">{{ h.hora|stringformat:"02d" }}h</span></div>{% endfor %}</div>
+  </section>
+  <section class="card" aria-labelledby="t-rank">
+    <h2 class="h2" id="t-rank">Ranking de personal</h2>
+    <div style="margin-top:10px">{% for r in per.ranking %}<div class="rank-d"><b>{{ r.codigo }}</b><span class="bar"><i style="width:{% porcentaje r.mesas max_mesas as pc %}{{ pc }}%;background:{% if forloop.first %}var(--petroleo){% else %}var(--turquesa){% endif %}"></i></span><span>{{ r.mesas }} mesas</span></div>{% endfor %}</div>
+    <p class="muted" style="font-size:12px;margin-top:10px">Identificado por comportamiento. Sin nombres ni rostros.</p>
+  </section>
+</div>
+{% endblock %}

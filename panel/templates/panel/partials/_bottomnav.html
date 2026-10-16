@@ -1,0 +1,9 @@
+{% load panel_extras %}
+<nav class="bottomnav" aria-label="Navegación principal">
+  {% nav_items as items %}
+  {% for it in items %}{% if it.movil %}
+    <a href="{{ it.url }}" {% if it.clave == activo %}aria-current="page"{% endif %}>
+      <span class="pill-i">{% icon it.icono 20 %}</span>{{ it.corto }}
+    </a>
+  {% endif %}{% endfor %}
+</nav>

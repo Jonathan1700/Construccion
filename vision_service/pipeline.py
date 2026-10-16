@@ -81,8 +81,14 @@ class ConfigMesas:
         el mismo umbral para ambas cosas, subir uno para filtrar falsos
         positivos de gente pasando cerca de la mesa termina también apagando
         la detección de visitas de staff.
+
+        Ojo: si las zonas de mesas vecinas quedan muy pegadas/superpuestas
+        (calibración poco ajustada), un valor muy bajo cuenta como "visita" el
+        simple roce del borde de alguien sentado en la mesa de al lado
+        acomodándose, sin haberse movido. 0.3 exige un solapamiento más
+        deliberado sin llegar al umbral de ocupación real.
         """
-        return self.parametros.get("umbral_overlap_visita_staff", 0.15)
+        return self.parametros.get("umbral_overlap_visita_staff", 0.3)
 
     @property
     def timeout_objeto_abandonado(self) -> timedelta:
@@ -109,7 +115,9 @@ class VisionPipeline:
         fps_muestreo: float = 2.0,
     ):
         self.config = ConfigMesas(ruta_config)
-        self.detector = detector or DetectorYOLO()
+        self.detector = detector or DetectorYOLO(
+            umbral_confianza=self.config.parametros.get("confianza_minima", 0.4)  # editable desde el panel
+        )
         self.tracker = tracker or TrackerPersonas()
         self.engine = OccupancyEngine(
             periodo_gracia=self.config.periodo_gracia,

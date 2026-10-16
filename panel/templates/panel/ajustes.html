@@ -1,0 +1,70 @@
+{% extends "panel/base.html" %}
+{% load static panel_extras %}
+{% block title %}Ajustes{% endblock %}
+{% block header %}
+<header class="pagehead" style="align-items:center">
+  <div style="display:flex;align-items:center;gap:12px">
+    <a class="iconbtn only-m" href="{% url 'panel:inicio' %}" aria-label="Volver al inicio">{% icon 'left' 20 %}</a>
+    <h1 class="h1" style="margin:0">Ajustes</h1>
+  </div>
+</header>
+{% endblock %}
+{% block content %}
+<form method="post" id="form-ajustes" novalidate style="display:flex;flex-direction:column;gap:18px;padding-bottom:96px;max-width:760px">
+  {% csrf_token %}
+  {% if form.errors %}<div class="alerta alerta--error" role="alert">{% icon 'alert' 20 2 %}<div><strong>Revisa los campos marcados</strong><p>No se guardó ningún cambio.</p></div></div>{% endif %}
+
+  <section aria-labelledby="g1"><h2 class="grupo-t" id="g1">Cámara y zonas</h2>
+    <div class="list">
+      <div class="li"><span class="tile-ico">{% icon 'camera' 18 %}</span><div class="txt"><strong>{{ camara.nombre }}</strong><span>{% if camara.en_vivo %}Transmitiendo{% else %}Sin señal{% endif %}</span></div>{% if camara.en_vivo %}<span class="chip chip--libre">En vivo</span>{% else %}<span class="chip chip--ocupada">Sin señal</span>{% endif %}</div>
+      <a class="li" href="{% url 'panel:zonas' %}"><span class="tile-ico">{% icon 'poly' 18 %}</span><div class="txt"><strong>Zonas configuradas</strong><span>{{ camara.mesas }} mesas · {{ camara.zonas_excluidas }} caja excluida · editar en computadora</span></div><span style="color:var(--turquesa)">{% icon 'right' 18 %}</span></a>
+    </div>
+  </section>
+
+  <section aria-labelledby="g2"><h2 class="grupo-t" id="g2">Detección</h2>
+    <div class="list">
+      <div class="setting">
+        <div class="setting-row"><label for="id_periodo_gracia_min">Período de gracia</label>
+          <div class="mini-input {% if form.periodo_gracia_min.errors %}is-error{% endif %}"><input type="number" inputmode="numeric" min="1" max="30" name="periodo_gracia_min" id="id_periodo_gracia_min" value="{{ form.periodo_gracia_min.value|default_if_none:'' }}" {% if form.periodo_gracia_min.errors %}aria-invalid="true" aria-describedby="e-gracia"{% endif %}><span>min</span></div></div>
+        <span class="help">Tiempo sin personas antes de pasar a “casi libre”.</span>
+        {% for e in form.periodo_gracia_min.errors %}<span class="field-error" id="e-gracia">{% icon 'alert' 14 2 %}{{ e }}</span>{% endfor %}
+      </div>
+      <div class="setting">
+        <div class="setting-row"><label for="id_solo_objetos_min">Solo objetos, sin personas</label>
+          <div class="mini-input {% if form.solo_objetos_min.errors %}is-error{% endif %}"><input type="number" inputmode="numeric" min="1" max="30" name="solo_objetos_min" id="id_solo_objetos_min" placeholder="definir" value="{{ form.solo_objetos_min.value|default_if_none:'' }}" {% if form.solo_objetos_min.errors %}aria-invalid="true" aria-describedby="e-obj"{% endif %}><span>min</span></div></div>
+        <span class="help">Si quedan cosas en la mesa pero nadie vuelve, se libera tras este tiempo.</span>
+        {% for e in form.solo_objetos_min.errors %}<span class="field-error" id="e-obj">{% icon 'alert' 14 2 %}{{ e }}</span>{% endfor %}
+      </div>
+      <div class="setting">
+        <div class="setting-row"><label for="id_confianza_min">Confianza mínima</label><output for="id_confianza_min" id="out-confianza" class="num" style="font-size:15px;font-weight:700">{{ form.confianza_min.value|coma }}</output></div>
+        <input type="range" name="confianza_min" id="id_confianza_min" min="0.1" max="0.95" step="0.05" value="{{ form.confianza_min.value|stringformat:'s'|cut:',' }}" data-out="out-confianza">
+        <span class="help">Detecciones por debajo de este valor se ignoran.</span>
+        {% for e in form.confianza_min.errors %}<span class="field-error">{% icon 'alert' 14 2 %}{{ e }}</span>{% endfor %}
+      </div>
+    </div>
+  </section>
+</form>
+
+<section aria-labelledby="g3" style="max-width:760px"><h2 class="grupo-t" id="g3">Cuenta</h2>
+  <div class="list">
+    <div class="li"><span class="tile-ico">{% icon 'users' 18 %}</span><div class="txt"><strong>{{ request.user.first_name|default:"Administrador" }}</strong><span>{{ request.user.email|default:request.user.get_username }}</span></div></div>
+    <form method="post" action="{% url 'panel:logout' %}">{% csrf_token %}<button class="link-danger" type="submit">{% icon 'logout' 18 %}Cerrar sesión</button></form>
+  </div>
+</section>
+
+<div class="savebar">
+  <a class="btn btn--sec" href="{% url 'panel:inicio' %}">Descartar</a>
+  <button class="btn" type="submit" form="form-ajustes">Guardar cambios</button>
+</div>
+
+{% if guardado %}
+<div class="overlay" role="dialog" aria-modal="true" aria-labelledby="dlg-t" data-dialog>
+  <div class="dialog">
+    <span class="ok">{% icon 'check' 30 2 %}</span>
+    <h2 id="dlg-t">Cambios guardados</h2>
+    <p>Los nuevos parámetros se aplicarán desde la siguiente detección.</p>
+    <div class="btns"><a class="btn" href="{% url 'panel:inicio' %}" data-autofocus>Volver al inicio</a><a class="btn btn--sec" href="{% url 'panel:ajustes' %}">Seguir editando</a></div>
+  </div>
+</div>
+{% endif %}
+{% endblock %}

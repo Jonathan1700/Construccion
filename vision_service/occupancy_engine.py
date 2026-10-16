@@ -1,8 +1,9 @@
 """
-Motor de estado de ocupación por mesa: zona fija + overlap geométrico + período
-de gracia, para no confundir una ausencia temporal (cliente va al baño o a la
-caja) con que la mesa quedó libre, ni una persona que solo pasa cerca con que
-la mesa se ocupó.
+Motor de estado de ocupación por mesa: zona fija + overlap geométrico. La mesa
+se marca "ocupada" apenas se detecta una persona en su zona (sin período de
+gracia de apertura). El período de gracia solo aplica al CIERRE: para no
+confundir una ausencia temporal (cliente va al baño o a la caja) con que la
+mesa quedó libre.
 
 Es la pieza más importante del microservicio de visión y por eso está escrita
 sin dependencias de OpenCV/YOLO: se testea con datos sintéticos (secuencias de
@@ -19,15 +20,16 @@ y el personal todavía no retira. Sin este timeout un objeto mantendría la mesa
 "ocupada" indefinidamente.
 
 Reglas:
-  * Un objeto solo NUNCA abre una ocupación: la gracia de apertura tiene que
-    ser iniciada por una persona. Así los platos sucios que quedan tras liberar
-    la mesa no generan ocupaciones fantasma en bucle. Si la persona deja sus
-    cosas y va a la caja antes de que se cumpla la gracia, el objeto sí
-    "sostiene" la apertura (caso normal en este negocio: se pide y paga en caja).
+  * Un objeto solo NUNCA abre una ocupación: tiene que haber una persona. Así
+    los platos sucios que quedan tras liberar la mesa no generan ocupaciones
+    fantasma en bucle. Una vez abierta por una persona, un objeto sí "sostiene"
+    la ocupación si la persona se levanta (caso normal en este negocio: se pide
+    y paga en caja, dejando sus cosas en la mesa).
   * Con la mesa ocupada, si desaparecen las personas pero quedan objetos, se
     entra en gracia de liberación pero el plazo que aplica es
     `timeout_objeto_abandonado` en vez de `periodo_gracia`.
-  * Si vuelve a haber una persona, la liberación se cancela en cualquier caso.
+  * Si vuelve a haber una persona DE FORMA SOSTENIDA (no un parpadeo de un solo
+    frame), la liberación se cancela.
 """
 
 from __future__ import annotations
@@ -49,10 +51,16 @@ TIMEOUT_OBJETO_ABANDONADO_DEFAULT = timedelta(seconds=120)
 MOTIVO_AUSENCIA_PERSONA = "ausencia_persona"
 MOTIVO_OBJETO_ABANDONADO = "objeto_abandonado"
 
+# Tolerancia durante EN_GRACIA_LIBERANDO: un solo frame donde vuelve a
+# detectarse a alguien (parpadeo de YOLO, o el bbox de una persona sentada en
+# OTRA mesa apenas rozando esta zona) no debe cancelar la liberación de
+# inmediato ni reiniciar el conteo. Solo una presencia SOSTENIDA por más de
+# esto confirma que el cliente realmente volvió.
+TOLERANCIA_INTERRUPCION_GRACIA_DEFAULT = timedelta(seconds=6)
+
 
 class EstadoMesa(str, Enum):
     LIBRE = "libre"
-    EN_GRACIA_OCUPANDO = "en_gracia_ocupando"  # empezó a haber presencia, confirmando
     OCUPADA = "ocupada"
     EN_GRACIA_LIBERANDO = "en_gracia_liberando"  # dejó de haber presencia, confirmando
 
@@ -79,6 +87,10 @@ class _EstadoInterno:
     # Durante EN_GRACIA_LIBERANDO: True si en el último frame quedaban objetos
     # sobre la mesa (sin personas). Decide qué plazo aplica.
     solo_objetos: bool = False
+    # Durante EN_GRACIA_LIBERANDO: desde cuándo hay presencia sostenida sin
+    # interrupción (para confirmar que el cliente volvió de verdad, no un
+    # parpadeo de detección). None mientras no haya presencia.
+    regreso_desde: datetime | None = None
 
 
 class OccupancyEngine:
@@ -86,9 +98,11 @@ class OccupancyEngine:
         self,
         periodo_gracia: timedelta = timedelta(seconds=45),
         timeout_objeto_abandonado: timedelta = TIMEOUT_OBJETO_ABANDONADO_DEFAULT,
+        tolerancia_interrupcion_gracia: timedelta = TOLERANCIA_INTERRUPCION_GRACIA_DEFAULT,
     ):
         self.periodo_gracia = periodo_gracia
         self.timeout_objeto_abandonado = timeout_objeto_abandonado
+        self.tolerancia_interrupcion_gracia = tolerancia_interrupcion_gracia
         self._estados: dict[int, _EstadoInterno] = {}
 
     def _estado_de(self, mesa_id: int) -> _EstadoInterno:
@@ -123,33 +137,22 @@ class OccupancyEngine:
         st = self._estado_de(mesa_id)
 
         if st.estado == EstadoMesa.LIBRE:
-            # Un objeto solo no abre ocupación (platos sucios, mochila olvidada).
+            # Un objeto solo no abre ocupación (platos sucios, mochila olvidada):
+            # hace falta una persona. A diferencia del cierre, la apertura no
+            # tiene período de gracia: se confirma "ocupada" apenas se detecta
+            # a alguien (a pedido: el período de gracia queda reservado para
+            # cuando la mesa ya está ocupada y la persona se levanta).
             if hay_persona:
-                st.estado = EstadoMesa.EN_GRACIA_OCUPANDO
-                st.desde = timestamp
+                st.estado = EstadoMesa.OCUPADA
+                st.ocupacion_actual_inicio = timestamp
                 st.max_personas_en_ocupacion = num_personas
                 st.confianza_acumulada = [confianza]
-            return None
-
-        if st.estado == EstadoMesa.EN_GRACIA_OCUPANDO:
-            if not hay_presencia:
-                # falsa alarma (alguien pasó cerca): vuelve a libre sin evento.
-                st.estado = EstadoMesa.LIBRE
-                st.desde = None
-                return None
-            # Aquí sí vale un objeto solo: la persona ya inició la gracia y pudo
-            # haber ido a la caja dejando sus cosas.
-            st.max_personas_en_ocupacion = max(st.max_personas_en_ocupacion, num_personas)
-            st.confianza_acumulada.append(confianza)
-            if timestamp - st.desde >= self.periodo_gracia:
-                st.estado = EstadoMesa.OCUPADA
-                st.ocupacion_actual_inicio = st.desde  # la ocupación "empieza" al inicio de la gracia
                 return EventoMotor(
                     tipo="abrir_ocupacion",
                     mesa_id=mesa_id,
-                    timestamp=st.ocupacion_actual_inicio,
-                    num_personas_detectadas=st.max_personas_en_ocupacion,
-                    confianza=sum(st.confianza_acumulada) / len(st.confianza_acumulada),
+                    timestamp=timestamp,
+                    num_personas_detectadas=num_personas,
+                    confianza=confianza,
                 )
             return None
 
@@ -165,11 +168,19 @@ class OccupancyEngine:
 
         if st.estado == EstadoMesa.EN_GRACIA_LIBERANDO:
             if hay_persona:
-                # el cliente volvió (baño, caja): se cancela la liberación.
-                st.estado = EstadoMesa.OCUPADA
-                st.desde = None
-                st.solo_objetos = False
+                if st.regreso_desde is None:
+                    st.regreso_desde = timestamp
+                elif timestamp - st.regreso_desde >= self.tolerancia_interrupcion_gracia:
+                    # presencia sostenida (no un parpadeo): el cliente volvió de
+                    # verdad (baño, caja) y se cancela la liberación.
+                    st.estado = EstadoMesa.OCUPADA
+                    st.desde = None
+                    st.regreso_desde = None
+                    st.solo_objetos = False
                 return None
+            # la ausencia de presencia (aunque sea tras un parpadeo dentro de la
+            # tolerancia) descarta cualquier "regreso" que no se llegó a confirmar.
+            st.regreso_desde = None
             st.solo_objetos = solo_objetos
             plazo = self.timeout_objeto_abandonado if solo_objetos else self.periodo_gracia
             if timestamp - st.desde >= plazo:

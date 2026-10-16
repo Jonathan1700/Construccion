@@ -210,7 +210,15 @@ class FuenteFrames:
             self.total_frames = 1
             self.fps = 1.0
         else:
-            self._cap = cv2.VideoCapture(fuente)
+            if isinstance(fuente, int):
+                # Sin pedir resolución explícita, algunas cámaras UVC arrancan
+                # en un modo recortado de baja resolución ("zoom") en vez de
+                # su campo de visión completo.
+                self._cap = cv2.VideoCapture(fuente, cv2.CAP_DSHOW)
+                self._cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1920)
+                self._cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 1080)
+            else:
+                self._cap = cv2.VideoCapture(fuente)
             if not self._cap.isOpened():
                 raise FileNotFoundError(f"No se pudo abrir el video/cámara {fuente}")
             self.total_frames = int(self._cap.get(cv2.CAP_PROP_FRAME_COUNT) or 0)

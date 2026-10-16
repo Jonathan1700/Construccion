@@ -1,0 +1,9 @@
+{% load panel_extras %}{% nivel f.segundos promedio as nv %}
+<a class="wait-row" href="{% url 'panel:mesa' f.mesa_id %}" data-nivel="{{ nv }}" data-seg="{{ f.segundos }}" data-prom="{{ promedio }}">
+  <span class="badge">{{ f.codigo }}</span>
+  <span class="wait-mid">
+    <small>{% if nv == "tarde" %}sobre el promedio{% else %}{{ f.personas }} persona{{ f.personas|pluralize }}{% if detalle %} · {{ f.entregas }} entrega{{ f.entregas|pluralize }}{% endif %}{% if f.fusion %} · mesas unidas{% endif %}{% endif %}</small>
+    <span class="bar"><i style="width:{% barra_espera f.segundos promedio as pc %}{{ pc }}%"></i></span>
+  </span>
+  <span class="timer num" data-timer>{{ f.segundos|mmss }}</span>
+</a>

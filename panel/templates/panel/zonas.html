@@ -1,0 +1,75 @@
+{% extends "panel/base.html" %}
+{% load static panel_extras %}
+{% block title %}Zonas y cámaras{% endblock %}
+{% block header %}
+<header class="pagehead">
+  <div><div class="kicker" style="text-transform:none;letter-spacing:0;font-size:14px;font-weight:600">Configuración</div>
+    <h1 class="h1">Zonas y cámaras</h1>
+    <p class="h1-sub d-only">Dibuja el área de cada mesa sobre la imagen de la cámara.</p></div>
+  <div class="actions d-inline" id="zonas-acciones" hidden>
+    <a class="btn btn--sec btn--sm" href="{% url 'panel:inicio' %}">Descartar</a>
+    <button class="btn btn--sm" type="button" id="z-guardar">Guardar cambios</button>
+  </div>
+</header>
+{% endblock %}
+{% block content %}
+<section class="card zonas-aviso" style="flex-direction:column;gap:10px">
+  <h2 class="h2">Edita las zonas desde un computador</h2>
+  <p class="muted" style="font-size:14px">Dibujar polígonos sobre la imagen de la cámara requiere precisión. En el celular puedes consultar las zonas actuales.</p>
+  <div class="list" style="padding:0 0;background:none">
+    {% for zn in z.zonas %}<div class="li" style="min-height:48px"><span class="badge" style="min-width:56px;height:36px;background:{% if zn.tipo == 'caja' %}var(--caja-bg);color:var(--gris);border-color:var(--gris){% else %}var(--libre-bg);color:var(--libre-fg);border-color:var(--libre-bd){% endif %}">{{ zn.nombre }}</span><span class="muted" style="font-size:13px">{{ zn.puntos|length }} vértices{% if zn.tipo == 'caja' %} · excluida{% endif %}</span></div>{% endfor %}
+  </div>
+</section>
+
+<div class="zonas-ed" id="zonas-app" hidden>
+  <div>
+    <div class="tools" role="toolbar" aria-label="Herramientas de dibujo">
+      <button class="tool" type="button" data-tool="select" aria-pressed="true">{% icon 'cursor' 18 %}Seleccionar</button>
+      <button class="tool" type="button" data-tool="mesa" aria-pressed="false">{% icon 'poly' 18 %}Dibujar mesa</button>
+      <button class="tool" type="button" data-tool="caja" aria-pressed="false">{% icon 'cash' 18 %}Zona de caja</button>
+      <button class="tool" type="button" data-tool="borrar">{% icon 'trash' 18 %}Borrar zona</button>
+      <span class="muted d-inline" style="margin-left:auto;font-size:13px;align-items:center;gap:6px">{% icon 'camera' 16 %}Cámara 1 · Salón</span>
+    </div>
+    <div class="canvas" id="z-canvas">
+      <svg viewBox="0 0 {{ z.ancho }} {{ z.alto }}" preserveAspectRatio="xMidYMid meet" role="application" aria-label="Zonas dibujadas sobre la imagen de la cámara">
+        <g id="z-fondo">
+          {% if z.frame_url %}<image href="{{ z.frame_url }}" width="{{ z.ancho }}" height="{{ z.alto }}" preserveAspectRatio="xMidYMid slice"/>
+          {% else %}<path d="M0 110H800M0 200H800M0 340H800M140 450L300 100M400 450V100M660 450L500 100M0 450L220 110M800 450L580 110" stroke="#1E4452" stroke-width="1" fill="none"/>{% endif %}
+        </g>
+        <g id="z-capa"></g>
+      </svg>
+      <span class="tag">Fotograma de referencia</span>
+    </div>
+    <p class="muted" style="font-size:13px;margin-top:12px" id="z-ayuda">Haz clic para agregar vértices; doble clic (o Enter) para cerrar la zona. Arrastra los puntos para ajustarla.</p>
+    <p class="field-error" id="z-error" hidden role="alert" style="margin-top:8px"></p>
+  </div>
+  <aside class="side-ed" aria-label="Propiedades">
+    <section class="card" aria-labelledby="t-sel">
+      <div class="row-between"><h2 class="h2" id="t-sel">Zona seleccionada</h2><span class="chip chip--casi_libre" id="z-badge" hidden>Editando</span></div>
+      <div style="display:flex;flex-direction:column;gap:14px;margin-top:14px" id="z-form">
+        <div class="field"><label for="z-nombre">Nombre</label><div class="input"><input type="text" id="z-nombre" maxlength="40" autocomplete="off"></div></div>
+        <div class="field"><span class="label">Tipo de zona</span><div class="seg-tipo"><button type="button" data-tipo="mesa" aria-pressed="true">Mesa</button><button type="button" data-tipo="caja" aria-pressed="false">Caja (excluida)</button></div></div>
+        <div class="field" id="z-cap-wrap"><label for="z-cap">Capacidad (personas)</label><div class="input"><input type="number" id="z-cap" min="1" max="20" inputmode="numeric"></div></div>
+        <div class="field" id="z-adj-wrap"><span class="label">Mesas adyacentes (para fusión)</span><div class="adj" id="z-adj"></div>
+          <div class="input" style="min-height:44px"><input type="text" id="z-adj-in" placeholder="Agregar, p. ej. M3" maxlength="6" aria-label="Agregar mesa adyacente"><button type="button" id="z-adj-add" class="tool" style="min-height:36px;padding:0 10px" aria-label="Agregar">{% icon 'plus' 16 %}</button></div></div>
+      </div>
+      <p class="muted" id="z-sel-vacio" style="font-size:13px;margin-top:14px">Selecciona una zona en la imagen o en la lista.</p>
+    </section>
+    <section class="card" aria-labelledby="t-lista" style="padding:16px">
+      <div class="row-between"><h2 class="h2" id="t-lista">Todas las zonas</h2><span class="muted num" style="font-size:12px;font-weight:600" id="z-count"></span></div>
+      <div class="zlist" id="z-lista"></div>
+    </section>
+  </aside>
+</div>
+
+<div class="overlay" id="z-ok" role="dialog" aria-modal="true" aria-labelledby="zok-t" hidden>
+  <div class="dialog">
+    <span class="ok">{% icon 'check' 36 2 %}</span>
+    <h2 id="zok-t">Zonas guardadas</h2>
+    <p id="zok-p">Se actualizaron las zonas. El sistema usará esta configuración en la siguiente detección.</p>
+    <div class="btns" style="flex-direction:row;justify-content:center"><button class="btn btn--sec" type="button" id="zok-seguir">Seguir editando</button><a class="btn" href="{% url 'panel:inicio' %}">Ir al panel</a></div>
+  </div>
+</div>
+{{ z|json_script:"zonas-data" }}
+<script>window.PANEL_ZONAS_URL = "{% url 'panel:zonas_guardar' %}";</script>
+{% endblock %}

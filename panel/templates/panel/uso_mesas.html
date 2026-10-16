@@ -1,0 +1,32 @@
+{% extends "panel/base.html" %}
+{% load static panel_extras %}
+{% block title %}Uso de mesas{% endblock %}
+{% block header %}
+<header class="pagehead">
+  <div><div class="kicker">Métrica 3</div><h1 class="h1">Uso de mesas</h1></div>
+  <div class="actions"><a class="iconbtn only-m" href="{% url 'panel:ajustes' %}" aria-label="Ajustes">{% icon 'settings' 20 %}</a></div>
+</header>
+{% endblock %}
+{% block content %}
+{% include "panel/partials/_periodo.html" %}
+<div class="cols-2">
+  <section aria-labelledby="t-calor" style="display:flex;flex-direction:column;gap:12px">
+    <div class="row-between"><h2 class="h2" id="t-calor">Mapa de calor</h2><span class="muted" style="font-size:12px;font-weight:600">ocupaciones</span></div>
+    {% include "panel/partials/_plano.html" with mesas=mesas_calor plano=uso.plano enlace=True %}
+    <div><div class="escala" aria-hidden="true"><i style="background:var(--turq-claro);border-color:var(--turquesa)"></i><i style="background:var(--limon);border-color:var(--casi-bd)"></i><i style="background:var(--turquesa);border-color:var(--turquesa)"></i><i style="background:var(--petroleo);border-color:var(--petroleo)"></i></div>
+      <div class="escala-lbl"><span>Menos usada</span><span>Más usada</span></div></div>
+  </section>
+  <div style="display:flex;flex-direction:column;gap:16px">
+    <div class="two">
+      <div class="hero" style="padding:16px;gap:0"><span style="font-size:12px;font-weight:700">Más usada</span><span style="font-family:var(--serif);font-size:40px;font-weight:600">{{ uso.mas_usada.codigo }}</span><span style="font-size:13px">{{ uso.mas_usada.usos }} ocupaciones</span></div>
+      <div class="card" style="padding:16px"><span class="muted" style="font-size:12px;font-weight:700;display:block">Menos usada</span><span style="font-family:var(--serif);font-size:40px;font-weight:600;display:block">{{ uso.menos_usada.codigo }}</span><span class="muted" style="font-size:13px">{{ uso.menos_usada.usos }} ocupaciones</span></div>
+    </div>
+    <section class="card" aria-labelledby="t-todas">
+      <h2 class="h2" id="t-todas">Todas las mesas</h2>
+      <div style="margin-top:8px">
+        {% for m in uso.orden %}<div class="rank-d" style="display:flex;align-items:center;gap:10px;padding:7px 0"><b style="width:40px;font-size:14px">{{ m.codigo }}</b><span class="bar" style="flex:1;height:10px;border-radius:5px;background:var(--arena)"><i style="width:{% porcentaje m.usos max_uso as pc %}{{ pc }}%;background:{% if pc >= 80 %}var(--petroleo){% elif pc >= 55 %}var(--turquesa){% elif pc >= 30 %}var(--limon){% else %}var(--turq-claro){% endif %};border:1px solid var(--petroleo);border-radius:5px"></i></span><span class="num" style="width:32px;text-align:right;font-size:14px;font-weight:700">{{ m.usos }}</span></div>{% endfor %}
+      </div>
+    </section>
+  </div>
+</div>
+{% endblock %}

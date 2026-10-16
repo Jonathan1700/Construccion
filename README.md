@@ -132,6 +132,41 @@ python manage.py runserver
 Endpoints CRUD disponibles bajo `/api/`: `mesas/`, `personal/`, `ocupaciones/`,
 `entregas/`; y los 3 endpoints de métricas listados arriba.
 
+## Panel web del local (`panel/`)
+
+Interfaz para el dueño/administrador (Django: plantillas + CSS + JS sin dependencias), servida
+en la raíz del mismo proyecto: `http://localhost:8000/` (la API sigue en `/api/` y el admin en `/admin/`).
+
+```bash
+python manage.py crear_demo   # usuario de prueba: admin@correo.com / scaneats2026 (o usar createsuperuser)
+python manage.py runserver
+```
+
+| Pantalla | URL | De dónde salen los datos |
+|---|---|---|
+| Inicio (resumen + plano en vivo) | `/` | `EventoOcupacion` abiertos (`fin` vacío) |
+| Tiempo de espera (métrica 1) | `/espera/` | `EventoEntrega.tiempo_espera_segundos` |
+| Personal (métrica 2) | `/personal/` | `EventoEntrega` por `Personal` (ocupaciones atendidas) |
+| Uso de mesas (métrica 3, mapa de calor) | `/uso-mesas/` | `EventoOcupacion` por `Mesa`, sin contar fusionadas |
+| Detalle de mesa (temporizador) | `/mesas/<id>/` | ocupación en curso + sus entregas |
+| Evidencia de video | `/evidencia/` | `EventoOcupacion.clip_s3_url` |
+| Ajustes de detección | `/ajustes/` | `parametros` de `vision_service/config/mesas_zonas.json` |
+| Zonas y cámaras (editor) | `/zonas/` | `mesas` del mismo JSON + `Mesa.zona_poligono` |
+
+- Las vistas piden todo a un backend (`panel/services/`): `ApiBackend` (datos reales, por defecto) o
+  `DemoBackend` (datos fijos del prototipo), según `PANEL_BACKEND`.
+- **Ajustes y Zonas escriben la config del pipeline** (`PANEL_CONFIG_VISION`, por defecto
+  `vision_service/config/mesas_zonas.json`); el pipeline la lee al arrancar, así que hay que reiniciarlo
+  para aplicar cambios. Ajustes guarda `periodo_gracia_segundos`, `timeout_objeto_abandonado_segundos` y
+  `confianza_minima` (umbral de YOLOv8). Zonas además crea/actualiza las `Mesa` de la API por el número del
+  nombre ("Mesa 3" → `numero=3`) y desactiva (no borra) las mesas de la cámara que quedan sin zona.
+  La zona de caja se guarda en `zonas_excluidas` (hoy solo la usa el panel).
+- Fotograma de fondo del editor: `<config>.frame.png` si existe; si no, el `.preview.png` de la calibración.
+- "Casi libre" no se muestra con datos reales: el pipeline no reporta la gracia de liberación a la API.
+- "En vivo / Sin señal" es una aproximación: sin eventos en `PANEL_MINUTOS_SIN_SENAL` (30) minutos y sin
+  ocupaciones abiertas se muestra "Sin señal".
+- Producción: `python manage.py collectstatic` (destino `staticfiles/`).
+
 ## Calibración de zonas de mesa con video real
 
 `vision_service/config/mesas_zonas.json` trae coordenadas de **ejemplo**. La
@@ -243,8 +278,8 @@ un cambio local en `EventoOcupacion.clip_s3_url`.
 ## Tests
 
 ```bash
-# API Django (8 tests: métricas + evidencia)
-python manage.py test monitoreo
+# API Django + panel (8 tests de monitoreo, 37 del panel)
+python manage.py test monitoreo panel
 
 # Microservicio de visión (54 tests; los 3 de test_opencv_smoke.py se saltan si no hay OpenCV)
 python -m unittest discover -s vision_service/tests -t .

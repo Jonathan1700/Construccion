@@ -1,0 +1,15 @@
+{% load panel_extras %}
+<aside class="side" aria-label="Menú del panel">
+  <a class="logo" href="{% url 'panel:inicio' %}"><span class="mk">{% icon 'scan' 18 2 %}</span>ScanEats</a>
+  <nav aria-label="Secciones">
+    {% nav_items as items %}
+    {% for it in items %}
+      <a href="{{ it.url }}" {% if it.clave == activo %}aria-current="page"{% endif %}>{% icon it.icono 19 %}{{ it.largo }}</a>
+    {% endfor %}
+  </nav>
+  <div class="user">
+    <span class="avatar" aria-hidden="true">{{ request.user.get_username|slice:":2"|upper }}</span>
+    <div><b>{{ request.user.first_name|default:request.user.get_username }}</b><small>{{ nombre_local }}</small></div>
+    <form method="post" action="{% url 'panel:logout' %}">{% csrf_token %}<button type="submit" aria-label="Cerrar sesión">{% icon 'logout' 18 %}</button></form>
+  </div>
+</aside>

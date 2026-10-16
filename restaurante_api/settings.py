@@ -52,6 +52,7 @@ INSTALLED_APPS = [
     "django.contrib.staticfiles",
     "rest_framework",
     "monitoreo",
+    "panel",
 ]
 
 REST_FRAMEWORK = {
@@ -81,6 +82,7 @@ TEMPLATES = [
                 "django.template.context_processors.request",
                 "django.contrib.auth.context_processors.auth",
                 "django.contrib.messages.context_processors.messages",
+                "panel.context_processors.panel",
             ],
         },
     },
@@ -157,8 +159,29 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/5.2/howto/static-files/
 
 STATIC_URL = "static/"
+STATIC_ROOT = BASE_DIR / "staticfiles"  # destino de `collectstatic` en producción
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+
+
+# Panel web del local (app `panel`): interfaz para el dueño/administrador.
+AUTHENTICATION_BACKENDS = [
+    "panel.auth.CorreoOUsuarioBackend",  # entrar con correo o usuario
+    "django.contrib.auth.backends.ModelBackend",
+]
+LOGIN_URL = "panel:login"
+LOGIN_REDIRECT_URL = "panel:inicio"
+PANEL_NOMBRE_LOCAL = os.environ.get("PANEL_NOMBRE_LOCAL", "Encebollados X")
+# `ApiBackend` lee los datos reales (modelos de `monitoreo` + config del
+# microservicio de visión). `panel.services.demo.DemoBackend` = datos de ejemplo.
+PANEL_BACKEND = os.environ.get("PANEL_BACKEND", "panel.services.api.ApiBackend")
+# Config de zonas/parámetros que consume `vision_service.pipeline` (--config).
+# El panel la lee y la reescribe desde Ajustes y Zonas.
+PANEL_CONFIG_VISION = Path(
+    os.environ.get("PANEL_CONFIG_VISION", BASE_DIR / "vision_service" / "config" / "mesas_zonas.json")
+)
+# Sin ningún evento (ocupación/entrega) en este lapso, la cámara se muestra "Sin señal".
+PANEL_MINUTOS_SIN_SENAL = int(os.environ.get("PANEL_MINUTOS_SIN_SENAL", "30"))

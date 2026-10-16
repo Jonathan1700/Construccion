@@ -1,0 +1,47 @@
+{% extends "panel/base.html" %}
+{% load static panel_extras %}
+{% block title %}Iniciar sesión{% endblock %}
+{% block shell %}
+<div class="login-page">
+  <main class="login" id="contenido">
+    <div class="login-top">
+      <a class="logo" href="{% url 'panel:login' %}"><span class="mk">{% icon 'scan' 18 2 %}</span>ScanEats</a>
+      <div class="mosaico" aria-hidden="true">{% for i in "123456789012" %}<i></i>{% endfor %}</div>
+    </div>
+    <form class="login-form" method="post" novalidate>
+      {% csrf_token %}
+      <input type="hidden" name="next" value="{{ next }}">
+      <div>
+        <h1 class="h1">Panel del local</h1>
+        <p class="muted" style="margin-top:6px;font-size:14px">Acceso para la administración del restaurante.</p>
+      </div>
+      {% with alerta=form.alerta %}
+      {% if alerta %}
+      <div class="alerta alerta--error" role="alert">{% icon 'alert' 20 2 %}
+        <div><strong>{{ alerta.0 }}</strong><p>{{ alerta.1 }}</p></div>
+      </div>
+      {% endif %}
+      {% endwith %}
+      <div class="field">
+        <label for="{{ form.username.id_for_label }}">Correo</label>
+        <div class="input {% if form.username.errors %}is-error{% endif %}">{% icon 'mail' 18 %}
+          <input type="text" name="username" id="{{ form.username.id_for_label }}" value="{{ form.username.value|default:'' }}" autocomplete="username" inputmode="email" placeholder="admin@correo.com" {% if form.username.errors %}aria-invalid="true" aria-describedby="e-user"{% endif %} autofocus>
+        </div>
+        {% for e in form.username.errors %}<span class="field-error" id="e-user">{% icon 'alert' 14 2 %}{{ e }}</span>{% endfor %}
+      </div>
+      <div class="field">
+        <label for="{{ form.password.id_for_label }}">Contraseña</label>
+        <div class="input {% if form.password.errors %}is-error{% endif %}">{% icon 'lock' 18 %}
+          <input type="password" name="password" id="{{ form.password.id_for_label }}" autocomplete="current-password" placeholder="••••••••" {% if form.password.errors %}aria-invalid="true" aria-describedby="e-pass"{% endif %}>
+        </div>
+        {% for e in form.password.errors %}<span class="field-error" id="e-pass">{% icon 'alert' 14 2 %}{{ e }}</span>{% endfor %}
+      </div>
+      <div class="login-row">
+        <label class="check"><input type="checkbox" name="recordarme" {% if form.recordarme.value or not form.is_bound %}checked{% endif %}>Recordarme</label>
+      </div>
+      <button class="btn btn--block" type="submit" style="min-height:54px;border-radius:16px">Ingresar</button>
+      <p class="login-help">¿Olvidaste tu contraseña? Pídela a quien administra el sistema.</p>
+    </form>
+  </main>
+</div>
+{% endblock %}

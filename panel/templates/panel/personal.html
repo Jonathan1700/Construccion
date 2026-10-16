@@ -1,0 +1,34 @@
+{% extends "panel/base.html" %}
+{% load static panel_extras %}
+{% block title %}Personal{% endblock %}
+{% block header %}
+<header class="pagehead">
+  <div><div class="kicker">Métrica 2</div><h1 class="h1">Personal</h1></div>
+  <div class="actions"><a class="iconbtn only-m" href="{% url 'panel:ajustes' %}" aria-label="Ajustes">{% icon 'settings' 20 %}</a></div>
+</header>
+{% endblock %}
+{% block content %}
+{% include "panel/partials/_periodo.html" %}
+<div class="cols-2">
+  <section class="hero hero--top" aria-label="Quién atiende más">
+    <span style="display:flex;align-items:center;gap:8px;font-size:13px;font-weight:700">{% icon 'star' 18 %}Quien más atiende {% if periodo == 'hoy' %}hoy{% elif periodo == 'semana' %}esta semana{% else %}este mes{% endif %}</span>
+    <span class="big">{{ per.top.codigo }}</span>
+    <span style="font-size:14px">{{ per.top.mesas }} mesas atendidas · {{ per.top.pct_entregas }} % de las entregas</span>
+    <div class="pills"><span>Respuesta prom. {{ per.top.respuesta_s|minseg }}</span><span>Activo desde {{ per.top.activo_desde }}</span></div>
+  </section>
+  <div style="display:flex;flex-direction:column;gap:16px">
+    <section class="card" aria-labelledby="t-rank" style="padding:16px 18px 6px">
+      <h2 class="h2" id="t-rank">Ranking</h2>
+      <div style="margin-top:6px">
+        {% for r in per.ranking %}
+        <div class="rank-row"><span class="rank-n">{{ forloop.counter }}</span><span class="avatar" aria-hidden="true">{{ r.codigo|cut:"-" }}</span>
+          <div class="rank-mid"><div class="top"><span>{{ r.codigo }}</span><span>{{ r.mesas }} mesas</span></div>
+            <span class="bar bar--lg"><i style="width:{% porcentaje r.mesas max_mesas as pc %}{{ pc }}%"></i></span>
+            <small>Respuesta prom. {{ r.respuesta_s|minseg }} min</small></div></div>
+        {% endfor %}
+      </div>
+    </section>
+    <p class="tip">{% icon 'info' 20 %}<span><b>¿Cómo se identifica?</b> Por comportamiento: la persona visita varias mesas sin sentarse. No se guardan nombres ni rostros y la zona de caja no cuenta.</span></p>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,28 @@
+{% load static panel_extras %}<!doctype html>
+<html lang="es-EC">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#F6F1E7">
+  <title>{% block title %}Panel{% endblock %} · ScanEats</title>
+  <link rel="preload" href="{% static 'panel/fonts/figtree-latin-600-normal.woff2' %}" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="{% static 'panel/css/panel.css' %}">
+</head>
+<body data-estado-url="{% url 'panel:api_estado' %}">
+{% block shell %}
+<div class="app">
+  {% include "panel/partials/_sidebar.html" %}
+  <div class="main">
+    <a class="skip" href="#contenido">Saltar al contenido</a>
+    {% block header %}{% endblock %}
+    <main id="contenido" class="content">
+      {% block content %}{% endblock %}
+    </main>
+  </div>
+  {% if activo != "ajustes" %}{% include "panel/partials/_bottomnav.html" %}{% endif %}
+</div>
+{% endblock %}
+<script src="{% static 'panel/js/panel.js' %}" defer></script>
+{% block scripts %}{% endblock %}
+</body>
+</html>

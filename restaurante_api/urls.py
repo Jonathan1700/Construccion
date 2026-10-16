@@ -21,4 +21,6 @@ from django.urls import include, path
 urlpatterns = [
     path("admin/", admin.site.urls),
     path("api/", include("monitoreo.urls")),
+    # Panel web del local (interfaz). Va al final para que /admin/ y /api/ tengan prioridad.
+    path("", include("panel.urls")),
 ]

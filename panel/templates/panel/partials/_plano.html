@@ -1,0 +1,13 @@
+{% load panel_extras %}
+<div class="plano" role="group" aria-label="Plano del local">
+  {% for m in mesas %}
+    {% if enlace %}<a class="mesa {{ m.clase }}" href="{% url 'panel:mesa' m.id %}"
+      style="left:{% pos m.x plano.ancho %}%;top:{% pos m.y plano.alto %}%;width:{% pos m.w plano.ancho %}%;height:{% pos m.h plano.alto %}%"
+      aria-label="Mesa {{ m.id }}, {{ m.sub }}">
+      <span class="c">{{ m.codigo }}</span><span class="s">{{ m.sub }}</span></a>
+    {% else %}<div class="mesa {{ m.clase }}" style="left:{% pos m.x plano.ancho %}%;top:{% pos m.y plano.alto %}%;width:{% pos m.w plano.ancho %}%;height:{% pos m.h plano.alto %}%">
+      <span class="c">{{ m.codigo }}</span><span class="s">{{ m.sub }}</span></div>{% endif %}
+  {% endfor %}
+  {% if plano.caja %}<div class="plano-caja" style="left:{% pos plano.caja.x plano.ancho %}%;top:{% pos plano.caja.y plano.alto %}%;width:{% pos plano.caja.w plano.ancho %}%;height:{% pos plano.caja.h plano.alto %}%">{% icon 'cash' 16 %}Caja · excluida</div>{% endif %}
+  {% for f in plano.fusiones %}<div class="fusion" style="left:{% pos f.x plano.ancho %}%;top:{% pos f.y plano.alto %}%;width:{% pos f.w plano.ancho %}%;height:{% pos f.h plano.alto %}%"><b>{% icon 'link' 11 2.2 %}Unidas</b></div>{% endfor %}
+</div>

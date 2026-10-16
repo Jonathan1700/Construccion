@@ -1,0 +1,42 @@
+{% extends "panel/base.html" %}
+{% load static panel_extras %}
+{% block title %}Evidencia de video{% endblock %}
+{% block header %}
+<header class="pagehead">
+  <div><div class="kicker">Registro</div><h1 class="h1">Evidencia de video</h1></div>
+  <div class="actions"><a class="iconbtn only-m" href="{% url 'panel:ajustes' %}" aria-label="Ajustes">{% icon 'settings' 20 %}</a></div>
+</header>
+{% endblock %}
+{% block content %}
+<nav class="chips" aria-label="Filtrar por tipo de evento">
+  {% for f in filtros %}<a class="pill" href="?{% if f.clave %}tipo={{ f.clave }}{% endif %}" {% if f.activo %}aria-current="true"{% endif %}>{{ f.etiqueta }}</a>{% endfor %}
+</nav>
+<div class="cols-evid">
+  <div style="display:flex;flex-direction:column;gap:12px">
+    {% if sel %}
+    <div class="player">
+      {% if sel.url %}<video controls preload="metadata" playsinline src="{{ sel.url }}" aria-label="{{ sel.titulo }}"></video>
+      {% else %}<span class="fake" aria-hidden="true"></span><span class="nov">Vista previa no disponible</span>
+        <span class="playbtn" aria-hidden="true">{% icon 'play' 22 2 %}</span>
+        <div class="cap"><span>{{ sel.titulo }}</span><span class="num">{{ sel.hora }} · {{ sel.duracion_s|mmss }}</span></div>{% endif %}
+    </div>
+    <div class="actions-2">
+      {% if sel.url %}<a class="btn btn--sec btn--sm" href="{{ sel.url }}" download>{% icon 'download' 18 %}Descargar</a>{% else %}<span class="btn btn--sec btn--sm" aria-disabled="true">{% icon 'download' 18 %}Descargar</span>{% endif %}
+      <a class="btn btn--sm" href="{% url 'panel:mesa' sel.mesa_id %}">{% icon 'eye' 18 %}Ver mesa</a>
+    </div>
+    {% else %}
+    <div class="card" style="text-align:center;padding:32px 18px"><h2 class="h2">No hay clips para este filtro</h2><p class="muted" style="margin-top:6px">Prueba con otro tipo de evento.</p></div>
+    {% endif %}
+  </div>
+  <section class="card card--tight" aria-labelledby="t-clips">
+    <div class="wait-head" style="padding-top:12px"><h2 class="h2" id="t-clips">Recientes</h2><span class="muted" style="font-size:12px;font-weight:600">{{ clips|length }} clip{{ clips|length|pluralize }}</span></div>
+    {% for c in clips %}
+    <a class="clip" href="?{% if tipo %}tipo={{ tipo }}&{% endif %}clip={{ c.id }}" {% if sel and sel.id == c.id %}aria-current="true"{% endif %}>
+      <span class="th">{% icon 'play' 18 %}</span>
+      <span class="info"><strong>{{ c.titulo }}</strong><span class="num">{{ c.hora }} · {{ c.detalle }} · {{ c.duracion_s|mmss }}</span></span>
+      <span class="chip chip--{% if c.tipo == 'entrega' %}libre{% elif c.tipo == 'fusion' %}casi_libre{% else %}ocupada{% endif %}">{% if c.tipo == 'entrega' %}Entrega{% elif c.tipo == 'fusion' %}Fusión{% else %}Ocupación{% endif %}</span>
+    </a>
+    {% endfor %}
+  </section>
+</div>
+{% endblock %}

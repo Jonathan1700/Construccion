@@ -1,0 +1,54 @@
+{% extends "panel/base.html" %}
+{% load static panel_extras %}
+{% block title %}Mesa {{ m.id }}{% endblock %}
+{% block header %}
+<header class="pagehead" style="align-items:center">
+  <div style="display:flex;align-items:center;gap:12px">
+    <a class="iconbtn" href="{% url 'panel:espera' %}" aria-label="Volver al tiempo de espera">{% icon 'left' 20 %}</a>
+    <div><div class="muted" style="font-size:12px;font-weight:600">{{ nombre_local }}</div><h1 class="h1" style="margin:0">Mesa {{ m.id }}</h1></div>
+  </div>
+  <span class="chip chip--{{ m.estado }}">{{ m.estado|etiqueta_estado }}</span>
+</header>
+{% endblock %}
+{% block content %}
+{% if m.desde %}
+{% nivel m.segundos m.promedio_s as nv %}
+<div class="cols-2">
+<section aria-label="Temporizador de la mesa">
+  <div class="ring-wrap" data-seg="{{ m.segundos }}" data-prom="{{ m.promedio_s }}">
+    {% anillo m.segundos m.promedio_s %}
+    <div class="ring-centro" data-nivel="{{ nv }}">
+      <small>{% icon 'clock' 14 %}Esperando</small>
+      <span class="t num" data-timer data-seg="{{ m.segundos }}">{{ m.segundos|mmss }}</span>
+      <span class="delta" data-delta>{% delta_texto m.segundos m.promedio_s %}</span>
+    </div>
+  </div>
+  <div class="ring-leyenda"><span><i style="background:var(--turquesa)"></i>A tiempo</span><span><i style="background:var(--limon)"></i>Cerca del prom.</span><span><i style="background:var(--coral)"></i>Demorado</span><span><i style="background:var(--tarjeta);border:2px solid var(--tinta)"></i>Prom. {{ m.promedio_s|minseg }}</span></div>
+</section>
+<div style="display:flex;flex-direction:column;gap:18px">
+  <div class="trio">
+    <div class="stat stat--c"><small>Personas</small><strong>{{ m.personas }}</strong></div>
+    <div class="stat stat--c"><small>Entregas</small><strong>{{ m.entregas }}</strong></div>
+    <div class="stat stat--c"><small>Llegaron</small><strong>{{ m.desde|time:"H:i" }}</strong></div>
+  </div>
+  <section aria-labelledby="t-act">
+    <h2 class="h2" id="t-act" style="margin-bottom:14px">Actividad de la mesa</h2>
+    <div class="timeline">
+      {% for a in m.actividad %}<div class="tl"><span class="dot {{ a.tono }}"><i></i></span><div class="tl-body"><div class="top"><span>{{ a.titulo }}</span><time>{{ a.hora }}</time></div><p>{{ a.detalle }}</p></div></div>{% endfor %}
+    </div>
+  </section>
+  <div class="actions-2">
+    <a class="btn" href="{% url 'panel:evidencia' %}?tipo=ocupacion">Ver evidencia de video</a>
+    <a class="btn btn--sec" href="{% url 'panel:espera' %}">Volver al listado</a>
+  </div>
+</div>
+</div>
+{% else %}
+<section class="card" style="text-align:center;padding:32px 18px">
+  <span class="chip chip--{{ m.estado }}" style="margin-bottom:12px">{{ m.estado|etiqueta_estado }}</span>
+  <h2 class="h2" style="font-size:20px">La mesa no tiene una ocupación en curso</h2>
+  <p class="muted" style="margin-top:6px">El temporizador aparece cuando el sistema detecta personas en la mesa.</p>
+  <div class="actions-2" style="margin-top:20px"><a class="btn" href="{% url 'panel:evidencia' %}">Ver evidencia de video</a><a class="btn btn--sec" href="{% url 'panel:espera' %}">Volver al listado</a></div>
+</section>
+{% endif %}
+{% endblock %}

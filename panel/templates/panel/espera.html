@@ -1,0 +1,30 @@
+{% extends "panel/base.html" %}
+{% load static panel_extras %}
+{% block title %}Tiempo de espera{% endblock %}
+{% block header %}
+<header class="pagehead">
+  <div><div class="kicker">Métrica 1</div><h1 class="h1">Tiempo de espera</h1></div>
+  <div class="actions"><a class="iconbtn only-m" href="{% url 'panel:ajustes' %}" aria-label="Ajustes">{% icon 'settings' 20 %}</a></div>
+</header>
+{% endblock %}
+{% block content %}
+{% include "panel/partials/_periodo.html" %}
+<section class="card" aria-label="Resumen">
+  <div class="stats">
+    <div class="stat"><small>Promedio</small><strong>{{ esp.promedio_s|mmss }}</strong></div>
+    <div class="stat"><small>Máximo</small><strong style="color:var(--ocu-fg)">{{ esp.max_s|mmss }}</strong></div>
+    <div class="stat"><small>Mínimo</small><strong style="color:var(--libre-fg)">{{ esp.min_s|mmss }}</strong></div>
+  </div>
+  <p class="note">{% icon 'info' 16 %}<span>Desde que se ocupa la mesa hasta cada entrega; se promedian todas las entregas de la ocupación.</span></p>
+</section>
+<div class="cols-2">
+  <section class="card card--tight" aria-labelledby="t-curso">
+    <div class="wait-head" style="padding-top:12px"><h2 class="h2" id="t-curso">En curso · {{ esp.en_curso|length }} mesa{{ esp.en_curso|length|pluralize }}</h2><span class="chip chip--libre">En vivo</span></div>
+    {% for f in esp.en_curso %}{% include "panel/partials/_fila_espera.html" with f=f promedio=esp.promedio_s detalle=True %}{% empty %}<p class="muted" style="padding:18px 0">No hay mesas esperando en este momento.</p>{% endfor %}
+  </section>
+  <section class="card" aria-labelledby="t-horas">
+    <div class="row-between"><h2 class="h2" id="t-horas">Espera promedio por hora</h2><span class="muted" style="font-size:12px;font-weight:600">minutos</span></div>
+    <div class="bars">{% for h in esp.por_hora %}<div class="col {% if h.min == max_hora %}top{% endif %}"><span class="val">{{ h.min }}</span><span class="barra" style="--p:{% porcentaje h.min max_hora as pc %}{{ pc }}"></span><span class="hr">{{ h.hora|stringformat:"02d" }}h</span></div>{% endfor %}</div>
+  </section>
+</div>
+{% endblock %}

@@ -24,6 +24,7 @@ import argparse
 from datetime import datetime, timedelta
 from pathlib import Path
 
+from .geometry import overlap_ratio
 from .pipeline import VisionPipeline
 
 COLOR_LIBRE = (200, 200, 200)
@@ -99,7 +100,15 @@ def correr(ruta_video: str, ruta_config: str, velocidad: float = 1.0, fps_muestr
     pipeline = VisionPipeline(ruta_config=Path(ruta_config), api_client=api, evidencia=False)
 
     fuente = int(ruta_video) if str(ruta_video).isdigit() else ruta_video
-    cap = cv2.VideoCapture(fuente)
+    if isinstance(fuente, int):
+        # Sin pedir resolución explícita, algunas cámaras UVC (ej. Logitech
+        # Brio) arrancan en un modo recortado de baja resolución ("zoom") en
+        # vez de su campo de visión completo.
+        cap = cv2.VideoCapture(fuente, cv2.CAP_DSHOW)
+        cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1920)
+        cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 1080)
+    else:
+        cap = cv2.VideoCapture(fuente)
     fps_original = cap.get(cv2.CAP_PROP_FPS) or 30
     total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT)) or None
     salto_frames = max(int(fps_original / fps_muestreo), 1)
@@ -148,7 +157,10 @@ def correr(ruta_video: str, ruta_config: str, velocidad: float = 1.0, fps_muestr
             cv2.polylines(frame, [pts], True, color, 3)
             x, y = poligono[0]
 
-            etiqueta = f"Mesa {mesa_id}: {estado}"
+            overlap_max = max(
+                (overlap_ratio(t.bbox, poligono) for t in pipeline._ultimos_tracks), default=0.0
+            )
+            etiqueta = f"Mesa {mesa_id}: {estado} (overlap {overlap_max:.2f})"
             inicio_ocupacion = pipeline.engine.inicio_ocupacion_actual(mesa_id)
             if inicio_ocupacion is not None:
                 ocupacion_id = pipeline._ocupacion_api_id.get(mesa_id)

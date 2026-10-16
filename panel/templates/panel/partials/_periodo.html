@@ -1,0 +1,3 @@
+<div class="segmented" role="group" aria-label="Periodo">
+  {% for p in periodos %}<a href="{{ p.url }}" {% if p.activo %}aria-current="true"{% endif %}>{{ p.etiqueta }}</a>{% endfor %}
+</div>
